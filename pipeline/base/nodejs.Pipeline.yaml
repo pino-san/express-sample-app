@@ -1,0 +1,52 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: nodejs
+spec:
+  params:
+    - name: source-repo
+      type: string 
+      description: Source Code Repository
+    - name: image-repo
+      type: string
+      description: Image Repository
+#    - name: image-revision
+#      type: string
+  workspaces:
+    - name: pipeline-shared-data
+  tasks:
+    - name: clone-repository
+      taskRef:
+        name: git-clone
+        kind: ClusterTask
+      params:
+        - name: url
+          value: "$(params.source-repo)"
+      workspaces:
+        - name: output
+          workspace: pipeline-shared-data
+    - name: run-test
+      runAfter:
+        - clone-repository
+      taskref:
+        name: npm
+      params:
+        - name: ARGS
+          value:
+            - install-ci-test            
+      workspaces:
+        - name: source 
+          workspace: pipeline-shared-data
+    - name: create-image
+      runAfter:
+        - run-test
+      taskref:
+        name: buildah
+        kind: ClusterTask
+      params:
+        - name: IMAGE
+          value: "$(params.image-repo):$(tasks.clone-repository.results.commit)"          
+      workspaces:
+        - name: source 
+          workspace: pipeline-shared-data
+          
